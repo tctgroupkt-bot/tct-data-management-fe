@@ -1,0 +1,353 @@
+import { useEffect, useState } from "react";
+import { observer } from "mobx-react-lite";
+import PageBreadcrumb from "../../../components/common/PageBreadCrumb.tsx";
+import PageMeta from "../../../components/common/PageMeta.tsx";
+import { useStore } from "../../../app/stores/store.ts";
+import TableComponentCard from "../../../components/common/product/TableComponentCard.tsx";
+import UserTableComponent from "../../../components/tables/user/UserTableComponent.tsx";
+import Button from "../../../components/ui/button/Button.tsx";
+import ProductLabel from "../../../components/form/product-form/ProductLabel.tsx";
+import ProductInputField from "../../../components/form/product-form/input/product/ProductInputField.tsx";
+import { useApi } from "../../../hooks/useApi.ts";
+import { toast } from "react-toastify";
+import { AddUserDto } from "../../../app/models/user/user.model.ts";
+import ReactSelect from "react-select";
+import ProductDatePicker from "../../../components/form/product-form/product-date-picker.tsx";
+import { formatDateLocal } from "../../../app/common/common.ts";
+import { useTheme } from "../../../app/context/ThemeContext.tsx";
+
+
+function UserTable() {
+  const { userStore, roleStore } = useStore();
+  const { theme } = useTheme();
+  const {
+    listAllUser,
+    userList,
+    loading,
+  } = userStore;
+  const { isOnline } = useApi();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [formData, setFormData] = useState<AddUserDto>({
+    birthday: null,
+    fullName: "",
+    userName: "",
+    phoneNumber: "",
+    email: "",
+    roleId: 0
+  });
+  const [searchTerm, setSearchTerm] = useState("");
+  function changeRoleName(roleName: string) {
+    switch (roleName) {
+      case "Admin":
+        return "Quản trị viên";
+      case "SystemHandler":
+        return "Quản trị hệ thống";
+      case "Strategist":
+        return "Chiến lược giá";
+      case "Client":
+        return "Nhân viên";
+      case "SalesHead":
+      case "SalesManager":
+        return "Trưởng phòng Kinh doanh";
+      case "PurchasingHead":
+      case "PmhHead":
+        return "Trưởng phòng Mua hàng";
+      case "MarketingHead":
+        return "Trưởng phòng Marketing";
+      case "StorageHead":
+      case "WarehouseDeliveryHead":
+        return "Trưởng phòng Kho/Giao nhận";
+      case "SalesEmp":
+      case "SalesStaff":
+        return "Nhân viên Kinh doanh";
+      case "PurchasingEmp":
+      case "PmhStaff":
+        return "Nhân viên Mua hàng";
+      case "MarketingEmp":
+      case "MarketingStaff":
+        return "Nhân viên Marketing";
+      case "StorageEmp":
+      case "WarehouseDeliveryStaff":
+        return "Nhân viên Kho/Giao nhận";
+      default:
+        return roleName;
+    }
+  }
+
+  const roleOptions = Array.from(
+    new Map(
+      roleStore.roleList.map((role) => {
+        const label = changeRoleName(role.name);
+        return [label, { value: role.id, label }];
+      })
+    ).values()
+  );
+
+  const selectedRole = roleOptions.find(option => option.value === formData.roleId) || null;
+
+  useEffect(() => {
+    if (isOnline) {
+      listAllUser();
+    }
+  }, [isOnline]);
+
+  const handleSearchSubmit = async () => {
+    await userStore.searchUser();
+  };
+
+  return (
+    <>
+      <PageMeta
+        title="TCT Homemart Data Management"
+        description="Đây là bảng tài khoản của website TCT Homemart"
+      />
+      <PageBreadcrumb pageTitle="Tài khoản" />
+      <div className="space-y-6">
+        <TableComponentCard
+          title="Bảng tài khoản"
+          addButtonLink={"add-user"}
+          addButtonText={"Tạo tài khoản"}
+          useModal={true}
+          isModalOpen={isModalOpen}
+          modalClose={() => setIsModalOpen(false)}
+          onModalOpen={() => setIsModalOpen(true)}
+          modalStyle="w-full max-w-4xl rounded-3xl space-y-4 p-6"
+          className="text-white"
+          modalContent={
+            <div>
+              <h1 className="text-2xl font-bold mb-2 text-black">Tạo tài khoản người dùng</h1>
+              <div className="space-y-4">
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    try {
+                      const success = await userStore.addUser(formData);
+                      if (success) {
+                        setIsModalOpen(false);
+                        setFormData({
+                          birthday: null,
+                          fullName: "",
+                          userName: "",
+                          phoneNumber: "",
+                          email: "",
+                          roleId: 0
+                        });
+
+                      }
+                    } catch (error) {
+                      setIsModalOpen(false);
+                      console.error("Error updating user:", error);
+                      toast.error("Có lỗi xảy ra khi cập nhật thông tin người dùng");
+                    }
+                  }}
+                  className="space-y-4"
+                >
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <ProductLabel htmlFor="userName" tooltipId="unique-tooltip-id"
+                        tooltip="Đây là username, không được trùng với username của người dùng khác">Tên tài khoản</ProductLabel>
+                      <ProductInputField
+                        type="text"
+                        id="userName"
+                        name="userName"
+                        placeholder="Nhập tên tài khoản"
+                        value={formData.userName}
+                        onChange={(e) =>
+                          setFormData((data) => ({
+                            ...data,
+                            userName: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                    <div>
+                      <ProductLabel htmlFor="phoneNumber">Số điện thoại</ProductLabel>
+                      <ProductInputField
+                        type="tel"
+                        id="phoneNumber"
+                        name="phoneNumber"
+                        placeholder="Nhập số điện thoại"
+                        value={formData.phoneNumber ?? ""}
+                        onChange={(e) =>
+                          setFormData((data) => ({
+                            ...data,
+                            phoneNumber: e.target.value || "",
+                          }))
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <ProductLabel htmlFor="email">Email</ProductLabel>
+                      <ProductInputField
+                        type="email"
+                        id="email"
+                        name="email"
+                        placeholder="Nhập email"
+                        value={formData.email}
+                        onChange={(e) =>
+                          setFormData((data) => ({
+                            ...data,
+                            email: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                    <div>
+                      <ProductLabel htmlFor="birthday" tooltipId="unique-tooltip-id"
+                        tooltip="Đây là ngày sinh, nhập theo cú pháp tháng/ngày/năm">Ngày sinh</ProductLabel>
+                      <ProductDatePicker
+                        id="birthday"
+                        defaultDate={formData.birthday ?? undefined}
+                        onChange={(dates: Date[] | null) =>
+                          setFormData((data) => ({
+                            ...data,
+                            birthday: dates && dates[0] ? formatDateLocal(dates[0]) : "",
+                          }))
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <ProductLabel htmlFor="fullName" tooltipId="unique-tooltip-id"
+                        tooltip="Đây là họ tên, yêu cầu nhập đầy đủ họ và tên">Họ tên</ProductLabel>
+                      <ProductInputField
+                        type="text"
+                        id="fullName"
+                        name="fullName"
+                        placeholder="Nhập họ tên"
+                        value={formData.fullName}
+                        onChange={(e) =>
+                          setFormData((data) => ({
+                            ...data,
+                            fullName: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                    <div>
+                      <ProductLabel htmlFor="roleId">Vai trò</ProductLabel>
+                      <ReactSelect
+                        options={roleOptions}
+                        value={selectedRole}
+                        onChange={(selectedOption) =>
+                          setFormData((data) => ({
+                            ...data,
+                            roleId: selectedOption?.value ?? 0,
+                          }))
+                        }
+                        placeholder="Chọn vai trò"
+                        noOptionsMessage={() => "Không có kết quả"}
+                        styles={{
+                          control: (base) => ({
+                            ...base,
+                            minHeight: "44px",
+                            height: "44px",
+                            fontFamily: "Roboto, sans-serif",
+                            fontSize: "14px",
+                            backgroundColor: theme === 'dark' ? '#131827' : base.backgroundColor,
+                            color: theme === 'dark' ? '#fff' : base.color,
+                            borderColor: theme === 'dark' ? '#384052' : base.borderColor,
+                            border: theme === 'dark' ? '1px solid #384052' : '1px solid #e5e7eb',
+                          }),
+                          valueContainer: (base) => ({
+                            ...base,
+                            height: "44px",
+                            padding: "0 8px",
+                            backgroundColor: theme === 'dark' ? '#131827' : base.backgroundColor,
+                            color: theme === 'dark' ? '#fff' : base.color,
+                          }),
+                          indicatorsContainer: (base) => ({
+                            ...base,
+                            height: "44px",
+                            backgroundColor: theme === 'dark' ? '#131827' : base.backgroundColor,
+                          }),
+                          option: (base, state) => ({
+                            ...base,
+                            fontFamily: "Roboto, sans-serif",
+                            backgroundColor: state.isFocused
+                              ? (theme === 'dark' ? '#23232b' : '#f3f4f6')
+                              : (theme === 'dark' ? '#131827' : 'white'),
+                            color: theme === 'dark' ? '#fff' : 'black',
+                          }),
+                          menu: (base) => ({
+                            ...base,
+                            backgroundColor: theme === 'dark' ? '#131827' : base.backgroundColor,
+                            color: theme === 'dark' ? '#fff' : base.color,
+                          }),
+                          singleValue: (base) => ({
+                            ...base,
+                            color: theme === 'dark' ? '#fff' : base.color,
+                          }),
+                          input: (base) => ({
+                            ...base,
+                            color: theme === 'dark' ? '#fff' : base.color,
+                          }),
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end space-x-4 pt-4">
+                    <Button
+                      type="submit"
+                      disabled={loading}
+                      className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-6 py-2.5 text-center text-sm font-bold text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {loading ? (
+                        <>
+                          <svg
+                            className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                          >
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                            ></circle>
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                            ></path>
+                          </svg>
+                          Đang xử lý...
+                        </>
+                      ) : (
+                        "Tạo tài khoản"
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          }
+          onSearch={(term) => {
+            setSearchTerm(term);
+            userStore.setTerm(term);
+          }}
+          onSearchSubmit={handleSearchSubmit}
+          isOnline={isOnline}
+        >
+          <UserTableComponent
+            data={Array.isArray(userList) ? [...userList] : []}
+            loading={loading}
+            totalPages={1}
+            currentPage={1}
+            onPageChange={() => {}}
+            totalCount={userList.length}
+            searchTerm={searchTerm}
+          />
+        </TableComponentCard>
+      </div>
+    </>
+  );
+}
+
+export default observer(UserTable);
